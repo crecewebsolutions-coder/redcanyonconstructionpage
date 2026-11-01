@@ -1,887 +1,572 @@
-/**
- * RED CANYON REMODELING LLC - MAIN JAVASCRIPT
- * High-performance animations, before/after comparison slider,
- * quote wizard modal, dynamic calculator, and lightbox.
- */
-
-document.addEventListener('DOMContentLoaded', () => {
-  initStickyHeader();
-  initMobileDrawer();
-  initScrollAnimations();
-  initCounterAnimations();
-  initHeroSlider();
-  initBeforeAfterSlider();
-  initGalleryFilter();
-  initLightbox();
-  initSubthemeAccordions();
-  initPhaseAccordions();
-  initSpCarousels();
-  initCalculator();
-  initQuoteWizardModal();
-  initFormHandler();
-  initFaqAccordion();
-  setCurrentYear();
-});
-
-/* ==========================================================================
-   STICKY HEADER
-   ========================================================================== */
-function initStickyHeader() {
-  const header = document.querySelector('.header');
-  if (!header) return;
-
-  let ticking = false;
-  const handleScroll = () => {
-    if (!ticking) {
-      window.requestAnimationFrame(() => {
-        if (window.scrollY > 40) {
-          header.classList.add('scrolled');
-        } else {
-          header.classList.remove('scrolled');
-        }
-        ticking = false;
-      });
-      ticking = true;
-    }
-  };
-
-  window.addEventListener('scroll', handleScroll, { passive: true });
-  handleScroll();
-}
-
-/* ==========================================================================
-   MOBILE DRAWER NAVIGATION
-   ========================================================================== */
-function initMobileDrawer() {
-  const toggleBtn = document.querySelector('.mobile-toggle');
-  const drawer = document.querySelector('.mobile-drawer');
-  const backdrop = document.querySelector('.drawer-backdrop');
-  const closeBtn = document.querySelector('.drawer-close');
-
-  if (!toggleBtn || !drawer) return;
-
-  const openDrawer = () => {
-    drawer.classList.add('active');
-    if (backdrop) backdrop.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  };
-
-  const closeDrawer = () => {
-    drawer.classList.remove('active');
-    if (backdrop) backdrop.classList.remove('active');
-    document.body.style.overflow = '';
-  };
-
-  toggleBtn.addEventListener('click', openDrawer);
-  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
-  if (backdrop) backdrop.addEventListener('click', closeDrawer);
-
-  const drawerLinks = drawer.querySelectorAll('a:not(.drawer-dropdown-title)');
-  drawerLinks.forEach(link => link.addEventListener('click', closeDrawer));
-
-  // Drawer dropdown accordion ("desplegar a gusto")
-  const drawerDropdownToggles = drawer.querySelectorAll('.drawer-dropdown-title, .drawer-dropdown-toggle');
-  drawerDropdownToggles.forEach(toggle => {
-    toggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const parent = toggle.closest('.drawer-dropdown');
-      if (parent) {
-        const isExpanded = parent.classList.toggle('active');
-        toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-      }
-    });
-  });
-
-  // Desktop nav touch support for dropdown
-  const desktopDropdowns = document.querySelectorAll('.nav-item-dropdown');
-  desktopDropdowns.forEach(dd => {
-    const toggle = dd.querySelector('.nav-dropdown-toggle');
-    if (toggle) {
-      toggle.addEventListener('click', (e) => {
-        // If on touch device, toggle class on tap
-        if (window.innerWidth <= 1024) {
-          e.preventDefault();
-          dd.classList.toggle('active');
-        }
-      });
-    }
-  });
-}
-
-/* ==========================================================================
-   SCROLL REVEAL ANIMATIONS (INTERSECTION OBSERVER)
-   ========================================================================== */
-function initScrollAnimations() {
-  const revealElements = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-zoom');
-  if (!revealElements.length) return;
-
-  const isMobile = window.innerWidth <= 768;
-
-  const observer = new IntersectionObserver((entries, obs) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('revealed');
-        obs.unobserve(entry.target);
-      }
-    });
-  }, {
-    root: null,
-    threshold: isMobile ? 0.05 : 0.12,
-    rootMargin: isMobile ? '40px 0px 0px 0px' : '0px 0px -40px 0px'
-  });
-
-  revealElements.forEach(el => observer.observe(el));
-}
-
-/* ==========================================================================
-   ANIMATED METRIC COUNTERS
-   ========================================================================== */
-function initCounterAnimations() {
-  const counters = document.querySelectorAll('[data-counter]');
-  if (!counters.length) return;
-
-  const observer = new IntersectionObserver((entries, obs) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const counter = entry.target;
-        const rawTarget = counter.getAttribute('data-counter') || '0';
-        const isDecimal = rawTarget.includes('.');
-        const targetValue = parseFloat(rawTarget);
-        const prefix = counter.getAttribute('data-prefix') || '';
-        const suffix = counter.getAttribute('data-suffix') || '';
-        const duration = 1800;
-        const startTime = performance.now();
-
-        function update(now) {
-          const elapsed = now - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          // Ease out exponential curve
-          const easeProgress = 1 - Math.pow(1 - progress, 3);
-          const current = isDecimal 
-            ? (easeProgress * targetValue).toFixed(1)
-            : Math.floor(easeProgress * targetValue);
-
-          counter.innerHTML = `${prefix}${current}<span>${suffix}</span>`;
-
-          if (progress < 1) {
-            requestAnimationFrame(update);
-          } else {
-            counter.innerHTML = `${prefix}${targetValue}<span>${suffix}</span>`;
-          }
-        }
-
-        requestAnimationFrame(update);
-        obs.unobserve(counter);
-      }
-    });
-  }, { threshold: 0.4 });
-
-  counters.forEach(c => observer.observe(c));
-}
-
-/* ==========================================================================
-   HERO SLIDER
-   ========================================================================== */
-function initHeroSlider() {
-  const slides = document.querySelectorAll('.hero-slider-img');
-  const dots = document.querySelectorAll('.slider-dot');
-  if (slides.length <= 1) return;
-
-  let current = 0;
-  const total = slides.length;
-
-  const showSlide = (index) => {
-    slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
-    current = index;
-  };
-
-  let timer = setInterval(() => {
-    showSlide((current + 1) % total);
-  }, 6000);
-
-  dots.forEach((dot, idx) => {
-    dot.addEventListener('click', () => {
-      clearInterval(timer);
-      showSlide(idx);
-      timer = setInterval(() => {
-        showSlide((current + 1) % total);
-      }, 6000);
-    });
-  });
-}
-
-/* ==========================================================================
-   INTERACTIVE BEFORE / AFTER SLIDER
-   ========================================================================== */
-function initBeforeAfterSlider() {
-  const container = document.querySelector('.before-after-wrapper');
-  if (!container) return;
-
-  const overlay = container.querySelector('.before-after-overlay');
-  const handle = container.querySelector('.before-after-handle');
-  const imgOver = container.querySelector('.before-after-img-over');
-  if (!overlay || !handle) return;
-
-  let isDragging = false;
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let isIntentionalHorizontalDrag = false;
-
-  // Ensure overlay image width precisely matches container width on all viewports
-  const updateOverlayWidth = () => {
-    if (imgOver) {
-      imgOver.style.width = `${container.clientWidth}px`;
-    }
-  };
-
-  updateOverlayWidth();
-  window.addEventListener('resize', updateOverlayWidth, { passive: true });
-
-  const setSliderPosition = (x) => {
-    const rect = container.getBoundingClientRect();
-    let position = ((x - rect.left) / rect.width) * 100;
-
-    // Constrain position between 4% and 96%
-    if (position < 4) position = 4;
-    if (position > 96) position = 96;
-
-    overlay.style.width = `${position}%`;
-    handle.style.left = `${position}%`;
-  };
-
-  // Mouse drag handling (desktop)
-  const startMouseDrag = (e) => {
-    isDragging = true;
-    container.style.cursor = 'ew-resize';
-  };
-
-  const stopMouseDrag = () => {
-    isDragging = false;
-    container.style.cursor = '';
-  };
-
-  const onMouseMove = (e) => {
-    if (!isDragging) return;
-    setSliderPosition(e.clientX);
-  };
-
-  container.addEventListener('mousedown', startMouseDrag);
-  window.addEventListener('mouseup', stopMouseDrag);
-  window.addEventListener('mousemove', onMouseMove);
-
-  // Touch drag handling (mobile): strictly prevents hijacking vertical scrolling
-  container.addEventListener('touchstart', (e) => {
-    if (!e.touches || !e.touches[0]) return;
-    const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-    isIntentionalHorizontalDrag = false;
-
-    // If touching directly on the handle or button, immediately initiate drag
-    if (e.target.closest('.before-after-handle') || e.target.closest('.before-after-button')) {
-      isDragging = true;
-      isIntentionalHorizontalDrag = true;
-    } else {
-      isDragging = false;
-    }
-  }, { passive: true });
-
-  window.addEventListener('touchmove', (e) => {
-    if (!e.touches || !e.touches[0]) return;
-    const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartX);
-    const deltaY = Math.abs(touch.clientY - touchStartY);
-
-    // If user is clearly scrolling down/up vertically, cancel any slider drag so page scrolls smoothly
-    if (!isIntentionalHorizontalDrag && deltaY > 8 && deltaY > deltaX) {
-      isDragging = false;
-      return;
-    }
-
-    // If user explicitly swipes horizontally across the slider, activate drag
-    if (!isDragging && deltaX > 15 && deltaX > deltaY * 1.5) {
-      isDragging = true;
-      isIntentionalHorizontalDrag = true;
-    }
-
-    if (isDragging) {
-      setSliderPosition(touch.clientX);
-    }
-  }, { passive: true });
-
-  const stopTouchDrag = () => {
-    isDragging = false;
-    isIntentionalHorizontalDrag = false;
-  };
-
-  window.addEventListener('touchend', stopTouchDrag, { passive: true });
-  window.addEventListener('touchcancel', stopTouchDrag, { passive: true });
-
-  // Direct click to move
-  container.addEventListener('click', (e) => {
-    if (!isIntentionalHorizontalDrag) {
-      setSliderPosition(e.clientX);
-    }
-  });
-}
-
-/* ==========================================================================
-   PORTFOLIO GALLERY FILTERING
-   ========================================================================== */
-function initGalleryFilter() {
-  const filterBtns = document.querySelectorAll('.filter-btn');
-  const items = document.querySelectorAll('.gallery-item');
-  const albums = document.querySelectorAll('.album-card-block');
-
-  if (!filterBtns.length) return;
-
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const filterValue = btn.getAttribute('data-filter');
-
-      items.forEach(item => {
-        const category = item.getAttribute('data-category') || '';
-        const matches = (filterValue === 'all' || category === filterValue || category.split(' ').includes(filterValue));
-        if (matches) {
-          item.style.display = '';
-          setTimeout(() => {
-            item.style.opacity = '1';
-            item.style.transform = 'scale(1)';
-          }, 30);
-        } else {
-          item.style.opacity = '0';
-          item.style.transform = 'scale(0.95)';
-          setTimeout(() => {
-            item.style.display = 'none';
-          }, 250);
-        }
-      });
-
-      // Also filter parent album blocks when filtering by location or trade
-      albums.forEach(album => {
-        const albumCat = album.getAttribute('data-album') || '';
-        const matches = (filterValue === 'all' || albumCat === filterValue || albumCat.split(' ').includes(filterValue));
-        if (matches) {
-          album.style.display = '';
-        } else {
-          album.style.display = 'none';
-        }
-      });
-    });
-  });
-}
-
-/* ==========================================================================
-   EXPANDABLE SUBTHEMES FOR SPECIAL PROJECTS
-   ========================================================================== */
-function initSubthemeAccordions() {
-  const toggles = document.querySelectorAll('.sp-subtheme-toggle');
-  toggles.forEach(toggle => {
-    toggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      const parentBlock = toggle.closest('.sp-subtheme-block');
-      if (!parentBlock) return;
-
-      const isOpen = parentBlock.classList.contains('active');
-      parentBlock.classList.toggle('active');
-      toggle.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
-    });
-  });
-
-  const toggleAllBtns = document.querySelectorAll('.sp-toggle-all-btn');
-  toggleAllBtns.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const projectCard = btn.closest('.album-card-block');
-      if (!projectCard) return;
-      const subthemes = projectCard.querySelectorAll('.sp-subtheme-block');
-      const allActive = Array.from(subthemes).every(st => st.classList.contains('active'));
-
-      subthemes.forEach(st => {
-        if (allActive) {
-          st.classList.remove('active');
-          st.querySelector('.sp-subtheme-toggle')?.setAttribute('aria-expanded', 'false');
-        } else {
-          st.classList.add('active');
-          st.querySelector('.sp-subtheme-toggle')?.setAttribute('aria-expanded', 'true');
-        }
-      });
-
-      const iconSpan = btn.querySelector('.btn-icon');
-      const textSpan = btn.querySelector('.btn-text');
-      if (allActive) {
-        if (textSpan) textSpan.textContent = textSpan.getAttribute('data-expand-text') || 'Expandir Subtemas';
-        if (iconSpan) iconSpan.textContent = '▾';
-      } else {
-        if (textSpan) textSpan.textContent = textSpan.getAttribute('data-collapse-text') || 'Contraer Subtemas';
-        if (iconSpan) iconSpan.textContent = '▴';
-      }
-    });
-  });
-}
-
-/* ==========================================================================
-   SPECIAL PROJECTS PHASE ACCORDIONS ("desplegar a gusto")
-   ========================================================================== */
-function initPhaseAccordions() {
-  const phaseCards = document.querySelectorAll('.sp-phase-card');
-  if (!phaseCards.length) return;
-
-  phaseCards.forEach(card => {
-    const header = card.querySelector('.sp-phase-header');
-    if (!header) return;
-
-    header.setAttribute('role', 'button');
-    header.setAttribute('tabindex', '0');
-    header.setAttribute('aria-expanded', 'true');
-
-    const toggle = (e) => {
-      if (e.target.closest('a, button:not(.sp-phase-header)')) return;
-      const isCollapsed = card.classList.toggle('collapsed');
-      header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-      const label = card.querySelector('.sp-phase-toggle-label');
-      if (label) {
-        const isSpanish = document.documentElement.lang === 'es' || window.location.pathname.includes('proyecto');
-        label.textContent = isCollapsed 
-          ? (isSpanish ? 'Desplegar' : 'Expand') 
-          : (isSpanish ? 'Plegar' : 'Collapse');
-      }
-    };
-
-    header.addEventListener('click', toggle);
-    header.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggle(e);
-      }
-    });
-  });
-
-  const expandAllBtn = document.getElementById('expandAllPhases');
-  const collapseAllBtn = document.getElementById('collapseAllPhases');
-
-  if (expandAllBtn) {
-    expandAllBtn.addEventListener('click', () => {
-      phaseCards.forEach(card => {
-        card.classList.remove('collapsed');
-        card.querySelector('.sp-phase-header')?.setAttribute('aria-expanded', 'true');
-        const label = card.querySelector('.sp-phase-toggle-label');
-        if (label) {
-          const isSpanish = document.documentElement.lang === 'es' || window.location.pathname.includes('proyecto');
-          label.textContent = isSpanish ? 'Plegar' : 'Collapse';
-        }
-      });
-    });
-  }
-
-  if (collapseAllBtn) {
-    collapseAllBtn.addEventListener('click', () => {
-      phaseCards.forEach(card => {
-        card.classList.add('collapsed');
-        card.querySelector('.sp-phase-header')?.setAttribute('aria-expanded', 'false');
-        const label = card.querySelector('.sp-phase-toggle-label');
-        if (label) {
-          const isSpanish = document.documentElement.lang === 'es' || window.location.pathname.includes('proyecto');
-          label.textContent = isSpanish ? 'Desplegar' : 'Expand';
-        }
-      });
-    });
-  }
-}
-
-/* ==========================================================================
-   CAROUSEL NAVIGATION FOR SPECIAL PROJECTS PHOTO GALLERIES ("carrusel")
-   ========================================================================== */
-function initSpCarousels() {
-  const containers = document.querySelectorAll('.sp-carousel-wrapper, .sp-phase-card');
-  containers.forEach(container => {
-    const track = container.querySelector('.sp-carousel-track, .sp-desktop-photo-grid');
-    const prevBtn = container.querySelector('.sp-carousel-arrow.prev');
-    const nextBtn = container.querySelector('.sp-carousel-arrow.next');
-
-    if (!track) return;
-
-    const scrollCard = (direction) => {
-      const card = track.querySelector('.subtheme-photo-thumb');
-      const scrollAmount = card ? card.offsetWidth + 16 : 300;
-      track.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
-    };
-
-    if (prevBtn) {
-      prevBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        scrollCard(-1);
-      });
-    }
-
-    if (nextBtn) {
-      nextBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        scrollCard(1);
-      });
-    }
-  });
-}
-
-/* ==========================================================================
-   FULLSCREEN LIGHTBOX MODAL
-   ========================================================================== */
-function initLightbox() {
-  const lightbox = document.getElementById('lightboxModal');
-  if (!lightbox) return;
-
-  const lightboxImg = lightbox.querySelector('.lightbox-img');
-  const lightboxCategory = lightbox.querySelector('.lightbox-category');
-  const lightboxCaption = lightbox.querySelector('.lightbox-caption');
-  const closeBtn = lightbox.querySelector('.lightbox-close');
-  const prevBtn = lightbox.querySelector('.lightbox-prev');
-  const nextBtn = lightbox.querySelector('.lightbox-next');
-
-  const galleryItems = Array.from(document.querySelectorAll('.gallery-item'));
-  let currentIndex = -1;
-
-  const openLightbox = (index) => {
-    if (index < 0 || index >= galleryItems.length) return;
-    currentIndex = index;
-    const item = galleryItems[currentIndex];
-    const img = item.querySelector('img');
-    if (!img) return;
-
-    const title = item.querySelector('.gallery-title')?.textContent || '';
-    const tag = item.querySelector('.gallery-tag')?.textContent || '';
-    const caption = item.querySelector('.gallery-caption')?.textContent || '';
-
-    lightboxImg.src = img.src;
-    lightboxImg.alt = title;
-    if (lightboxCategory) lightboxCategory.textContent = tag;
-    if (lightboxCaption) lightboxCaption.textContent = title + (caption ? ' — ' + caption : '');
-
-    lightbox.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  };
-
-  const closeLightbox = () => {
-    lightbox.classList.remove('active');
-    document.body.style.overflow = '';
-  };
-
-  const showNext = () => {
-    if (currentIndex < galleryItems.length - 1) {
-      openLightbox(currentIndex + 1);
-    } else {
-      openLightbox(0);
-    }
-  };
-
-  const showPrev = () => {
-    if (currentIndex > 0) {
-      openLightbox(currentIndex - 1);
-    } else {
-      openLightbox(galleryItems.length - 1);
-    }
-  };
-
-  galleryItems.forEach((item, idx) => {
-    if (!item.classList.contains('video-thumb')) {
-      item.addEventListener('click', () => openLightbox(idx));
-    }
-  });
-
-  if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
-  if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); showPrev(); });
-  if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); showNext(); });
-
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox || e.target.classList.contains('lightbox-content')) {
-      closeLightbox();
-    }
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (!lightbox.classList.contains('active')) return;
-    if (e.key === 'Escape') closeLightbox();
-    if (e.key === 'ArrowRight') showNext();
-    if (e.key === 'ArrowLeft') showPrev();
-  });
-}
-
-/* ==========================================================================
-   PROJECT ESTIMATE CALCULATOR
-   ========================================================================== */
-function initCalculator() {
-  const typeSelect = document.getElementById('calcType');
-  const sizeInput = document.getElementById('calcSize');
-  const sizeVal = document.getElementById('calcSizeVal');
-  const tierSelect = document.getElementById('calcTier');
-  const priceDisplay = document.getElementById('calcPrice');
-  const timeDisplay = document.getElementById('calcTime');
-  const applyBtn = document.getElementById('calcApplyBtn');
-
-  if (!typeSelect || !sizeInput || !tierSelect || !priceDisplay) return;
-
-  const baseRates = {
-    kitchen: { base: 6800, perSqFt: 62, time: 'Custom Project Milestones (Permits, Custom Cabinetry & Slab Fabrication)' },
-    bathroom: { base: 4500, perSqFt: 48, time: '5 – 8 weeks (Tear-Down, Waterproofing Cure & Tile Setting)' },
-    wholehouse: { base: 18000, perSqFt: 42, time: '16 – 24 weeks (Comprehensive Multi-Trade Reconstruction)' },
-    closet: { base: 2800, perSqFt: 34, time: '3 – 5 weeks (Millwork Fabrication & Architectural Install)' },
-    outdoor: { base: 5500, perSqFt: 38, time: '6 – 10 weeks (Permits, Structural Framing & Masonry)' }
-  };
-
-  const tierMultipliers = {
-    premium: 1.0,
-    luxury: 1.25,
-    ultra: 1.60
-  };
-
-  function updateEstimate() {
-    const type = typeSelect.value || 'kitchen';
-    const sqft = parseInt(sizeInput.value, 10) || 250;
-    const tier = tierSelect.value || 'luxury';
-
-    if (sizeVal) sizeVal.textContent = sqft + ' sq ft';
-
-    const rate = baseRates[type] || baseRates.kitchen;
-    const mult = tierMultipliers[tier] || 1.45;
-
-    const estimated = (rate.base + (sqft * rate.perSqFt)) * mult;
-    const minCost = Math.round((estimated * 0.9) / 500) * 500;
-    const maxCost = Math.round((estimated * 1.15) / 500) * 500;
-
-    const fmtMin = '$' + minCost.toLocaleString('en-US');
-    const fmtMax = '$' + maxCost.toLocaleString('en-US');
-
-    priceDisplay.textContent = `${fmtMin} - ${fmtMax}`;
-    if (timeDisplay) {
-      timeDisplay.textContent = `Estimated Execution Time: ${rate.time}`;
-    }
-  }
-
-  typeSelect.addEventListener('change', updateEstimate);
-  sizeInput.addEventListener('input', updateEstimate);
-  tierSelect.addEventListener('change', updateEstimate);
-  updateEstimate();
-
-  if (applyBtn) {
-    applyBtn.addEventListener('click', () => {
-      const formService = document.getElementById('formService');
-      const formMessage = document.getElementById('formMessage');
-
-      if (formService) {
-        formService.value = typeSelect.value;
-      }
-      if (formMessage) {
-        formMessage.value = `[Calculated Estimate Summary]: Project Type: ${typeSelect.options[typeSelect.selectedIndex].text}, Scope Area: ${sizeInput.value} sq ft, Finish Tier: ${tierSelect.options[tierSelect.selectedIndex].text}, Estimated Range: ${priceDisplay.textContent}.\n\nAdditional project vision & custom requirements: `;
-      }
-
-      const formElem = document.getElementById('quoteSection') || document.querySelector('.form-card');
-      if (formElem) {
-        formElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (formMessage) formMessage.focus();
-      }
-    });
-  }
-}
-
-/* ==========================================================================
-   QUICK ESTIMATE WIZARD MODAL
-   ========================================================================== */
-function initQuoteWizardModal() {
-  const wizardModal = document.getElementById('quoteWizardModal');
-  const triggerBtns = document.querySelectorAll('.open-quote-wizard');
-  const closeBtn = document.querySelector('.wizard-modal-close');
-
-  if (!wizardModal) return;
-
-  const openModal = () => {
-    wizardModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  };
-
-  const closeModal = () => {
-    wizardModal.classList.remove('active');
-    document.body.style.overflow = '';
-  };
-
-  triggerBtns.forEach(btn => btn.addEventListener('click', openModal));
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-
-  wizardModal.addEventListener('click', (e) => {
-    if (e.target === wizardModal) closeModal();
-  });
-}
-
-/* ==========================================================================
-   QUOTE / CONTACT FORM HANDLER (Formspree AJAX Integration)
-   Endpoint: https://formspree.io/f/xljjpyop
-   ========================================================================== */
-function initFormHandler() {
-  const form = document.getElementById('quoteForm');
-  if (!form) return;
-
-  const feedback = document.getElementById('formFeedback');
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const name = form.querySelector('[name="name"]')?.value.trim();
-    const email = form.querySelector('[name="email"]')?.value.trim();
-    const location = form.querySelector('[name="location"]')?.value.trim() || 'Arizona';
-    const propertyType = form.querySelector('[name="propertyType"]')?.value || 'Single-Family Home';
-    const propertyAge = form.querySelector('[name="propertyAge"]')?.value || 'Not specified';
-    const budget = form.querySelector('[name="budget"]')?.value || 'Flexible / To be estimated';
-    const financing = form.querySelector('[name="financing"]')?.value || 'Not specified';
-    const occupancy = form.querySelector('[name="occupancy"]')?.value || 'Not specified';
-    const hoa = form.querySelector('[name="hoa"]')?.value || 'Not specified';
-    const plans = form.querySelector('[name="plans"]')?.value || 'Need Red Canyon to provide 3D design & permits';
-    const timeline = form.querySelector('[name="timeline"]')?.value || 'Flexible';
-    const message = form.querySelector('[name="message"]')?.value.trim();
-
-    // Collect multiple checked scopes
-    const checkedScopes = Array.from(form.querySelectorAll('input[name="scope"]:checked'))
-      .map(cb => cb.value);
-    const scopeSummary = checkedScopes.length ? checkedScopes.join(', ') : (form.querySelector('[name="service"]')?.value || 'Comprehensive Remodeling');
-
-    if (!name || !email || !message) {
-      if (feedback) {
-        feedback.className = 'form-feedback error';
-        feedback.innerHTML = '<strong>Attention:</strong> Please complete your Full Name, Email Address, and Project Details before submitting.';
-        feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-      return;
-    }
-
-    // Mandatory Policy Agreement Validation
-    const policyCheckbox = form.querySelector('[name="policyAgreement"]');
-    if (policyCheckbox && !policyCheckbox.checked) {
-      if (feedback) {
-        feedback.className = 'form-feedback error';
-        const isSpanish = document.documentElement.lang === 'es' || window.location.pathname.includes('contacto');
-        feedback.innerHTML = isSpanish
-          ? '<strong>Acción Requerida:</strong> Debe leer y marcar la casilla de aceptación de las Políticas y Condiciones del Servicio antes de enviar.'
-          : '<strong>Action Required:</strong> You must read and check the agreement box for our Policies & Service Conditions before proceeding.';
-        feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-      policyCheckbox.focus();
-      return;
-    }
-
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-        <span>Transmitting Estimate Request...</span>
-      `;
-    }
-
-    const quoteId = 'RC-' + Math.floor(1000 + Math.random() * 9000);
-
-    // Prepare FormData payload for Formspree endpoint
-    const formData = new FormData(form);
-    formData.set('Quote_File_ID', quoteId);
-    formData.set('Selected_Scopes', scopeSummary);
-    formData.set('_subject', `[New Project Quote #${quoteId}] ${name} - ${location}`);
-
-    try {
-      const response = await fetch('https://formspree.io/f/xljjpyop', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        if (feedback) {
-          feedback.className = 'form-feedback success';
-          feedback.innerHTML = `
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-              <div style="color: #4ade80; font-size: 1.5rem; line-height: 1;">✓</div>
-              <div>
-                <strong style="font-size: 1.1rem; color: var(--text-white);">Estimate Request #${quoteId} Successfully Submitted!</strong><br>
-                Thank you, <strong>${name}</strong>. Your project specifications have been securely routed to the Red Canyon Remodeling LLC contractor team.<br>
-                A licensed project estimator will review your project details and contact you at <strong>${email}</strong> within 24 business hours.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estimate & Contact | Red Canyon Remodeling LLC</title>
+  <meta name="description" content="Request a formal residential remodeling estimate from Red Canyon Remodeling LLC. Contact our estimators directly at redcanyonred@gmail.com or use our interactive cost calculator.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+    <!-- Top Bar -->
+  <div class="topbar">
+    <div class="container topbar-inner">
+      <div class="topbar-left">
+        <div class="topbar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          <span>Official Inquiries:</span>
+          <a href="mailto:redcanyonred@gmail.com" class="topbar-link">redcanyonred@gmail.com</a>
+        </div>
+        <div class="topbar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Hours: Mon – Fri: 8:00 AM – 5:00 PM</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <a href="tel:4809099379" class="topbar-phone-link">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <span>Direct Contractor Line: (480) 909-9379</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header & Desktop Navigation Menu with Luxury Dropdown -->
+  <header class="header">
+    <div class="container nav-container">
+      <a href="index.html" class="brand-logo" aria-label="Red Canyon Remodeling LLC">
+        <img src="assets/img/logo-transparent.png" alt="Red Canyon Remodeling LLC" class="official-logo-header">
+      </a>
+
+      <nav>
+        <ul class="nav-menu">
+          <li><a href="index.html" class="nav-link ">Home</a></li>
+          
+          <!-- Dropdown Menu for Special Projects -->
+          <li class="nav-item-dropdown">
+            <a href="portfolio.html" class="nav-link nav-dropdown-toggle ">
+              <span>Special Projects</span>
+              <svg class="dropdown-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </a>
+            <ul class="nav-dropdown-menu">
+              <li><a href="portfolio.html" class="dropdown-item ">All Special Projects</a></li>
+              <li><a href="project-casa-boss.html" class="dropdown-item ">Casa Boss Scottsdale</a></li>
+              <li><a href="project-san-tan.html" class="dropdown-item ">San Tan Residence</a></li>
+              <li><a href="project-home-office.html" class="dropdown-item ">Executive Home Office</a></li>
+            </ul>
+          </li>
+
+          <li><a href="services.html" class="nav-link ">Services</a></li>
+          <li><a href="process.html" class="nav-link ">Process</a></li>
+          <li><a href="about.html" class="nav-link ">About</a></li>
+          <li><a href="contact.html" class="nav-link active">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-cta">
+        <a href="tel:4809099379" class="nav-phone-pill">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <span>(480) 909-9379</span>
+        </a>
+        <a href="contact.html" class="btn btn-primary btn-sm">
+          <span>Request Estimate</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </a>
+        <button class="mobile-toggle" aria-label="Toggle Menu">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+    <!-- Mobile Drawer with Submenu -->
+  <div class="drawer-backdrop"></div>
+  <div class="mobile-drawer">
+    <div class="drawer-header">
+      <div class="brand-logo">
+        <img src="assets/img/logo-transparent.png" alt="Red Canyon Logo" style="height: 48px;">
+      </div>
+      <button class="drawer-close" aria-label="Close Navigation">✕</button>
+    </div>
+    <div class="drawer-nav">
+      <a href="index.html">Home</a>
+      
+      <div class="drawer-dropdown">
+        <button type="button" class="drawer-dropdown-title" aria-expanded="false">
+          <span>Special Projects</span>
+          <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="drawer-sublinks">
+          <a href="portfolio.html">· All Special Projects</a>
+          <a href="project-casa-boss.html">· Casa Boss Scottsdale</a>
+          <a href="project-san-tan.html">· San Tan Residence</a>
+          <a href="project-home-office.html">· Executive Home Office</a>
+        </div>
+      </div>
+
+      <a href="services.html">Services</a>
+      <a href="process.html">Process</a>
+      <a href="about.html">About</a>
+      <a href="contact.html" class="active">Contact</a>
+    </div>
+    <div style="border-top: 1px solid var(--border-subtle); padding-top: 1.5rem;">
+      <a href="tel:4809099379" style="color: var(--red-light); font-weight: 700; font-size: 1.1rem; display: block; margin-bottom: 0.75rem;">Direct: (480) 909-9379</a>
+      <a href="mailto:redcanyonred@gmail.com" style="color: var(--text-muted); font-size: 0.9rem; display: block; margin-bottom: 1.25rem;">redcanyonred@gmail.com</a>
+      <a href="contact.html" class="btn btn-primary" style="width: 100%;">Request Estimate</a>
+    </div>
+  </div>
+
+  <!-- Page Hero -->
+  <div class="page-hero">
+    <div class="container">
+      <div class="breadcrumbs">
+        <a href="index.html">Home</a>
+        <span>/</span>
+        <span style="color: var(--red-light);">Calculator & Estimate</span>
+      </div>
+      <span class="section-tag">Direct Contractor Hub</span>
+      <h1 class="section-title">Interactive Cost Calculator & Estimate Form</h1>
+      <p class="section-subtitle">
+        Configure your project scope below for an instant budget and timeline estimate, or submit your architectural specifications directly to our team.
+      </p>
+    </div>
+  </div>
+
+  <!-- Interactive Estimator -->
+  <section class="section-padding" style="background: var(--bg-dark); border-bottom: 1px solid var(--border-subtle);">
+    <div class="container">
+      <div class="text-center reveal">
+        <span class="section-tag">Interactive Estimator</span>
+        <h2 class="section-title">Configure Your Scope & Timeline</h2>
+        <p class="section-subtitle">
+          Select your target space, square footage, and finish tier to calculate a realistic preliminary construction range.
+        </p>
+      </div>
+
+      <div class="calculator-box reveal">
+        <div class="calc-grid">
+          <div class="calc-options">
+            <div class="calc-group">
+              <label for="calcType">Space / Project Type:</label>
+              <select id="calcType" class="calc-select">
+                <option value="kitchen">Gourmet Chef Kitchen & Island</option>
+                <option value="bathroom">Master Spa Bathroom & Shower</option>
+                <option value="wholehouse">Whole-Home Interior Remodel</option>
+                <option value="closet">Custom Walk-In Closet</option>
+                <option value="outdoor">Outdoor Living & Glass Garage</option>
+              </select>
+            </div>
+
+            <div class="calc-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem;">
+                <label for="calcSize" style="margin-bottom: 0;">Approximate Footprint:</label>
+                <span id="calcSizeVal" style="font-weight: 800; color: var(--red-light); font-size: 0.95rem;">250 sq ft</span>
+              </div>
+              <input type="range" id="calcSize" min="60" max="1500" value="250" step="10" class="calc-range">
+              <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-subtle); margin-top: 0.35rem;">
+                <span>60 sq ft</span>
+                <span>1,500 sq ft</span>
               </div>
             </div>
-          `;
-          feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-        form.reset();
-      } else {
-        const data = await response.json().catch(() => ({}));
-        let errorMsg = 'Oops! There was a problem submitting your form. Please try again.';
-        if (data && data.errors && data.errors.length) {
-          errorMsg = data.errors.map(err => err.message).join(', ');
-        }
-        if (feedback) {
-          feedback.className = 'form-feedback error';
-          feedback.innerHTML = `<strong>Submission Notice:</strong> ${errorMsg} <br>You can also reach our estimators directly at <a href="mailto:redcanyonred@gmail.com" style="color: var(--text-white); text-decoration: underline;">redcanyonred@gmail.com</a> or call <a href="tel:4809099379" style="color: var(--text-white); text-decoration: underline;">(480) 909-9379</a>.`;
-          feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }
-    } catch (err) {
-      if (feedback) {
-        feedback.className = 'form-feedback error';
-        feedback.innerHTML = `<strong>Network Notice:</strong> Unable to connect to the submission service. Please check your internet connection or reach our contractor directly at <a href="tel:4809099379" style="color: var(--text-white); text-decoration: underline;">(480) 909-9379</a> or <a href="mailto:redcanyonred@gmail.com" style="color: var(--text-white); text-decoration: underline;">redcanyonred@gmail.com</a>.`;
-        feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    } finally {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnHtml;
-      }
-    }
-  });
-}
 
-/* ==========================================================================
-   FAQ ACCORDION
-   ========================================================================== */
-function initFaqAccordion() {
-  const faqItems = document.querySelectorAll('.faq-item');
-  if (!faqItems.length) return;
+            <div class="calc-group">
+              <label for="calcTier">Material Tier:</label>
+              <select id="calcTier" class="calc-select">
+                <option value="premium">Premium — Granite & Porcelain Tile</option>
+                <option value="luxury" selected>Luxury — Quartz/Marble & Custom Millwork</option>
+                <option value="ultra">Ultra-Luxury — Bookmatched Stone & Smart</option>
+              </select>
+            </div>
+          </div>
 
-  faqItems.forEach(item => {
-    const question = item.querySelector('.faq-question');
-    const answer = item.querySelector('.faq-answer');
+          <div class="calc-result-card">
+            <span class="calc-result-label">Preliminary Investment Range</span>
+            <div class="calc-result-price" id="calcPrice">$25,000 - $32,000</div>
+            <div class="calc-result-time" id="calcTime">Project Milestones: Structured Phase Contracts (Permits, Custom Cabinetry & Slab Fabrication)</div>
+            <button id="calcApplyBtn" class="btn btn-primary" style="width: 100%;">
+              <span>Autofill Form Below</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    if (!question || !answer) return;
+  <!-- Main Contact & Form Section -->
+  <section class="section-padding" id="quoteFormSection">
+    <div class="container">
+      <div class="contact-layout">
+        <!-- Info Card -->
+        <div class="contact-info-card reveal-left">
+          <span class="section-tag">Official Channel</span>
+          <h2 style="font-size: 2.25rem; margin-bottom: 1.25rem;">Reach Out Directly</h2>
+          <p style="color: var(--text-muted); line-height: 1.75; font-size: 0.95rem; margin-bottom: 2rem;">
+            At <strong>Red Canyon Remodeling LLC</strong>, every client communicates directly with our experienced project leadership. Submit your details or email our office directly.
+          </p>
 
-    question.addEventListener('click', () => {
-      const isActive = item.classList.contains('active');
+          <div class="contact-info-list">
+            <div class="contact-info-item">
+              <div class="contact-icon-box">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              </div>
+              <div class="contact-details">
+                <h5>Official Business Email</h5>
+                <a href="mailto:redcanyonred@gmail.com">redcanyonred@gmail.com</a>
+              </div>
+            </div>
 
-      faqItems.forEach(other => {
-        other.classList.remove('active');
-        const otherAns = other.querySelector('.faq-answer');
-        if (otherAns) otherAns.style.maxHeight = null;
-      });
+            <div class="contact-info-item">
+              <div class="contact-icon-box">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="contact-details">
+                <h5>Hours of Operation</h5>
+                <p>Monday – Friday: 8:00 AM – 5:00 PM</p>
+                <span style="font-size: 0.8rem; color: var(--text-dim);">Closed Weekends · Average email response time under 24 business hours</span>
+              </div>
+            </div>
 
-      if (!isActive) {
-        item.classList.add('active');
-        answer.style.maxHeight = answer.scrollHeight + 'px';
-      }
-    });
-  });
+            <div class="contact-info-item">
+              <div class="contact-icon-box">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              </div>
+              <div class="contact-details">
+                <h5>Legal Business Status</h5>
+                <p>Red Canyon Remodeling LLC</p>
+                <span style="font-size: 0.8rem; color: var(--text-dim);">Licensed residential contractor with full liability insurance</span>
+              </div>
+            </div>
+          </div>
 
-  if (faqItems[0]) {
-    const firstAns = faqItems[0].querySelector('.faq-answer');
-    faqItems[0].classList.add('active');
-    if (firstAns) firstAns.style.maxHeight = firstAns.scrollHeight + 'px';
-  }
-}
+          <div class="service-areas-box">
+            <h5>Service Regions & Property Profiles</h5>
+            <div class="area-tags">
+              <span class="area-tag">Luxury Custom Homes</span>
+              <span class="area-tag">Scottsdale & Phoenix</span>
+              <span class="area-tag">Paradise Valley Estates</span>
+              <span class="area-tag">Gilbert & Chandler</span>
+              <span class="area-tag">Mesa & Fountain Hills</span>
+            </div>
+          </div>
+        </div>
 
-/* ==========================================================================
-   CURRENT YEAR
-   ========================================================================== */
-function setCurrentYear() {
-  const yr = document.getElementById('currentYear');
-  if (yr) {
-    yr.textContent = new Date().getFullYear();
-  }
-}
+        <!-- Form Card -->
+        <div class="form-card reveal-right">
+          <div class="form-header">
+            <h3>Official Estimate & Inquiry Form</h3>
+            <p>Complete this form to generate an official quote submission routed directly to <strong>redcanyonred@gmail.com</strong>.</p>
+          </div>
+
+          <form id="quoteForm">
+            <div class="form-grid">
+              <!-- Contact Information -->
+              <div class="form-group">
+                <label class="form-label" for="formName">Homeowner Full Name <span class="req">*</span></label>
+                <input type="text" id="formName" name="name" class="form-input" placeholder="e.g. Robert & Sarah Sterling" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="formEmail">Email Address <span class="req">*</span></label>
+                <input type="email" id="formEmail" name="email" class="form-input" placeholder="client@example.com" required>
+              </div>
+
+              <!-- Arizona Location -->
+              <div class="form-group">
+                <label class="form-label" for="formLocation">Arizona City / Region <span class="req">*</span></label>
+                <select id="formLocation" name="location" class="form-select" required>
+                  <option value="">Select your property city</option>
+                  <option value="Scottsdale (North / DC Ranch / Silverleaf)">Scottsdale (North / DC Ranch / Silverleaf)</option>
+                  <option value="Scottsdale (Central / Old Town / McCormick)">Scottsdale (Central / Old Town / McCormick)</option>
+                  <option value="Paradise Valley & Camelback Mountain">Paradise Valley & Camelback Mountain</option>
+                  <option value="Phoenix (Arcadia / Biltmore / Central)">Phoenix (Arcadia / Biltmore / Central)</option>
+                  <option value="San Tan Valley & Queen Creek">San Tan Valley & Queen Creek</option>
+                  <option value="Gilbert & Chandler">Gilbert & Chandler</option>
+                  <option value="Mesa & Tempe">Mesa & Tempe</option>
+                  <option value="Cave Creek & Carefree">Cave Creek & Carefree</option>
+                  <option value="Peoria & Glendale">Peoria & Glendale</option>
+                  <option value="Other Greater Phoenix Location">Other Greater Phoenix Location</option>
+                </select>
+              </div>
+
+              <!-- Property Architecture & Age -->
+              <div class="form-group">
+                <label class="form-label" for="formPropertyType">Property Style & Type</label>
+                <select id="formPropertyType" name="propertyType" class="form-select">
+                  <option value="Custom Desert Luxury Estate">Custom Desert Luxury Estate</option>
+                  <option value="Single-Family Detached Residence" selected>Single-Family Detached Residence</option>
+                  <option value="Modern Townhome / Penthouse">Modern Townhome / Penthouse</option>
+                  <option value="Historic District Residence">Historic District Residence</option>
+                </select>
+              </div>
+
+              <!-- Property Age -->
+              <div class="form-group">
+                <label class="form-label" for="formPropertyAge">Approximate Home Age</label>
+                <select id="formPropertyAge" name="propertyAge" class="form-select">
+                  <option value="Built 2015 or Newer">Built 2015 or Newer</option>
+                  <option value="2000 – 2014" selected>2000 – 2014</option>
+                  <option value="1980 – 1999">1980 – 1999</option>
+                  <option value="Pre-1980 (Historical / Older Substrates)">Pre-1980 (Historical / Older Substrates)</option>
+                </select>
+              </div>
+
+              <!-- Planned Budget -->
+              <div class="form-group">
+                <label class="form-label" for="formBudget">Planned Investment Range <span class="badge-fixed-price" style="font-size: 0.7rem; padding: 2px 8px; margin-left: 6px;">100% Fixed-Price</span></label>
+                <select id="formBudget" name="budget" class="form-select">
+                  <option value="Flexible / To be estimated">Select your planned budget range</option>
+                  <option value="$10,000 – $20,000">$10,000 – $20,000 (Bath / Closet Refresh)</option>
+                  <option value="$20,000 – $35,000">$20,000 – $35,000 (Master Bath or Kitchen)</option>
+                  <option value="$35,000 – $60,000">$35,000 – $60,000 (Chef Kitchen / Office)</option>
+                  <option value="$60,000 – $100,000">$60,000 – $100,000 (Kitchen + Master + Floors)</option>
+                  <option value="$100,000 – $180,000+">$100,000 – $180,000+ (Whole-Home Remodel)</option>
+                  <option value="Custom Architectural Specification">Custom Architectural Specification</option>
+                </select>
+              </div>
+
+              <!-- Financing Method -->
+              <div class="form-group">
+                <label class="form-label" for="formFinancing">Planned Funding Method</label>
+                <select id="formFinancing" name="financing" class="form-select">
+                  <option value="Private Capital / Cash Milestones" selected>Private Capital / Cash Milestones</option>
+                  <option value="Construction Loan / HELOC Equity">Construction Loan / HELOC Equity</option>
+                  <option value="Inquire about Red Canyon Milestone Options">Inquire about Red Canyon Milestone Options</option>
+                </select>
+              </div>
+
+              <!-- Target Groundbreak Timeline (Reconstruction Standards) -->
+              <div class="form-group">
+                <label class="form-label" for="formTimeline">Pre-Construction & Start Timeline</label>
+                <select id="formTimeline" name="timeline" class="form-select">
+                  <option value="Standard Pre-Construction & Permitting (4 to 6 Weeks)" selected>Standard Permitting & Planning (4 to 6 Weeks)</option>
+                  <option value="6 to 10 Weeks (HOA Review & Custom Material Sourcing)">6 to 10 Weeks (HOA Review & Material Sourcing)</option>
+                  <option value="2 to 4 Months (Full Architectural Planning)">2 to 4 Months (Full Architectural Planning)</option>
+                  <option value="Flexible / Material Procurement Aligned">Flexible / Material Procurement Aligned</option>
+                </select>
+              </div>
+
+              <!-- Specific Spaces Checklist -->
+              <div class="form-group full-width">
+                <label class="form-label">Spaces & Scopes Included in Your Project (Select all that apply):</label>
+                <div class="scope-checkbox-grid">
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Gourmet Chef Kitchen" checked>
+                    <span>Gourmet Chef Kitchen</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Master Spa Suite & Curbless Shower">
+                    <span>Master Spa Bathroom</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Custom Walk-In Closet">
+                    <span>Custom Walk-In Closet</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Home Office Addition & Partitioning">
+                    <span>Home Office Addition</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Vanishing Pocket Glass Doors">
+                    <span>Pocket Glass Doors</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Whole-Home Flooring Replacement">
+                    <span>Flooring Throughout</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Load-Bearing Wall Removal">
+                    <span>Wall Removal / Open Layout</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Showroom Garage & Epoxy">
+                    <span>Showroom Garage</span>
+                  </label>
+                  <label class="scope-checkbox-label">
+                    <input type="checkbox" name="scope" value="Outdoor Pergola & Living Patio">
+                    <span>Outdoor Pergola & Patio</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Project Logistics Row -->
+              <div class="form-group">
+                <label class="form-label" for="formOccupancy">Will You Reside On-Site During Remodel?</label>
+                <select id="formOccupancy" name="occupancy" class="form-select">
+                  <option value="Yes - Residing On-Site (Require Dust Barrier Protocol)" selected>Yes (Require Dust Barrier & Air Scrubbing Protocol)</option>
+                  <option value="No - Vacant Home or Temporary Relocation">No (Vacant Residence / Off-site)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="formHoa">HOA Review & City Permits Status</label>
+                <select id="formHoa" name="hoa" class="form-select">
+                  <option value="Need Red Canyon to manage HOA packet & City Permits" selected>Need Red Canyon to manage HOA Packet & Permits</option>
+                  <option value="Architectural Drawings already stamped & approved">Architectural Drawings already approved</option>
+                  <option value="No HOA / Basic Permitting">No HOA Community / Basic Permitting</option>
+                </select>
+              </div>
+
+              <!-- Detailed Specifications -->
+              <div class="form-group full-width">
+                <label class="form-label" for="formMessage">Detailed Architectural Vision & Custom Specifications <span class="req">*</span></label>
+                <textarea id="formMessage" name="message" class="form-textarea" placeholder="Detail your exact requirements: desired countertops (Calacatta, quartzite, granite), cabinetry style (frameless, slab, shaker), tile motifs, lighting layout, and any specific structural transformations..." required></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label class="form-label">Attach Existing Space Photos or Blueprints (Optional)</label>
+                <div class="file-upload-zone" onclick="document.getElementById('formFiles').click()">
+                  <input type="file" id="formFiles" style="display: none;" multiple accept="image/*,.pdf">
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  <p>Click or drop image attachments here</p>
+                  <span>Supports: JPG, PNG, PDF (You can also email blueprints directly to redcanyonred@gmail.com)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Official Company Policies & Service Conditions -->
+            <div class="policies-wrapper">
+              <div class="policies-header">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--red-light); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <h4>Policies & Service Conditions</h4>
+              </div>
+
+              <div class="policies-scroll-list" tabindex="0" role="region" aria-label="Policies and Service Conditions">
+                <div class="policy-clause">
+                  <strong>1. Estimates & Project Pricing:</strong> Estimates are provided based on the initial project scope and details shared by the client. Final pricing is confirmed in a written agreement before work begins. Any requested modifications or unforeseen conditions will be discussed and approved prior to proceeding.
+                </div>
+                <div class="policy-clause">
+                  <strong>2. Payments & Agreements:</strong> Projects require a signed agreement and an initial deposit before scheduling or starting work. Remaining payments are structured in clear milestones outlined in the contract, ensuring transparency and alignment throughout the project.
+                </div>
+                <div class="policy-clause">
+                  <strong>3. Changes & Additional Work:</strong> Any additions, material upgrades, or design changes requested after work begins will be documented through a written change order outlining the updated cost and timeline before execution.
+                </div>
+                <div class="policy-clause">
+                  <strong>4. Construction Timelines:</strong> Estimated schedules are established before construction starts. While we make every effort to maintain projected completion dates, timelines may occasionally adjust due to permit approvals, material lead times, or unexpected site discoveries.
+                </div>
+                <div class="policy-clause">
+                  <strong>5. Permits & Building Standards:</strong> All construction, electrical, and plumbing work is conducted in accordance with applicable local building codes. When permits are required, we coordinate the application and inspection process to ensure full regulatory compliance.
+                </div>
+                <div class="policy-clause">
+                  <strong>6. Quality & Workmanship:</strong> We are committed to delivering high-quality craftsmanship, durable materials, and professional execution. Every project undergoes thorough quality reviews before final completion to guarantee client satisfaction.
+                </div>
+                <div class="policy-clause">
+                  <strong>7. Customer Communication:</strong> Clear, timely communication is fundamental to our process. Clients receive regular updates regarding progress, next steps, and any key decisions needed along the way.
+                </div>
+                <div class="policy-clause">
+                  <strong>8. Privacy & Customer Information:</strong> All personal details, project documentation, and property information shared with Red Canyon Remodeling LLC are kept strictly confidential and used solely for the purpose of planning and executing your project.
+                </div>
+
+                <div class="policy-commitment-box">
+                  <strong>Our Commitment:</strong> “At Red Canyon, our goal is not simply to build structures, but to build lasting relationships through quality, integrity, and dependable service.”
+                </div>
+              </div>
+
+              <!-- Mandatory Client Agreement Checkbox -->
+              <label class="policy-agreement-row" for="policyAgreement">
+                <input type="checkbox" id="policyAgreement" name="policyAgreement" class="policy-checkbox" required>
+                <div class="policy-checkbox-label">
+                  <strong>I have read, understood, and accept the Policies & Service Conditions <span style="color: var(--red-light);">*</span></strong>
+                  <span>Checking this box is required before submitting your project estimate request.</span>
+                </div>
+              </label>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+              <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                <span>Submit Official Estimate Request</span>
+              </button>
+            </div>
+
+            <div id="formFeedback" class="form-feedback"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+    <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-top">
+      <div class="footer-brand">
+        <a href="index.html" class="brand-logo" style="margin-bottom: 1.25rem; display: inline-flex;">
+          <img src="assets/img/logo-transparent.png" alt="Red Canyon Logo" style="height: 48px;">
+        </a>
+        <p>Licensed Arizona general contractor specializing in open-concept structural remodeling and luxury architectural finishes.</p>
+        <div style="margin-top: 1rem;">
+          <span class="financing-pill-badge" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            Flexible Financing Available
+          </span>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul class="footer-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="portfolio.html">Special Projects</a></li>
+          <li><a href="services.html">Services</a></li>
+          <li><a href="process.html">Process</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="contact.html">Request Estimate</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Special Projects</h4>
+        <ul class="footer-links">
+          <li><a href="project-casa-boss.html">Casa Boss Scottsdale</a></li>
+          <li><a href="project-san-tan.html">San Tan Residence</a></li>
+          <li><a href="project-home-office.html">Executive Home Office</a></li>
+          <li><a href="terms.html">Craftsmanship Warranty</a></li>
+          <li><a href="privacy-policy.html">Privacy Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col footer-contact">
+        <h4>Direct Contact</h4>
+        <div class="footer-contact-item">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <div>
+            <span style="display:block; font-size: 0.75rem; color: var(--text-dim);">Contractor Phone:</span>
+            <a href="tel:4809099379" style="font-weight: 700; color: var(--text-white);">(480) 909-9379</a>
+          </div>
+        </div>
+        <div class="footer-contact-item">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          <div>
+            <span style="display:block; font-size: 0.75rem; color: var(--text-dim);">Official Inquiries:</span>
+            <a href="mailto:redcanyonred@gmail.com" style="color: var(--red-light); font-weight: 600;">redcanyonred@gmail.com</a>
+          </div>
+        </div>
+        <div class="footer-contact-item">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <div>
+            <span style="display:block; font-size: 0.75rem; color: var(--text-dim);">Hours:</span>
+            <span>Mon – Fri: 8:00 AM – 5:00 PM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container footer-bottom">
+      <div style="font-size: 0.85rem; color: var(--text-dim);">
+        &copy; <span id="currentYear">2026</span> <strong>Red Canyon Remodeling LLC</strong>. ROC #349120. All rights reserved.
+      </div>
+      <div style="display: flex; gap: 1.5rem; font-size: 0.85rem;">
+        <a href="terms.html" style="color: var(--text-dim);">Terms & Conditions</a>
+        <a href="privacy-policy.html" style="color: var(--text-dim);">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
+
