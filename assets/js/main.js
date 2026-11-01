@@ -716,7 +716,8 @@ function initQuoteWizardModal() {
 }
 
 /* ==========================================================================
-   QUOTE / CONTACT FORM HANDLER
+   QUOTE / CONTACT FORM HANDLER (Formspree AJAX Integration)
+   Endpoint: https://formspree.io/f/xljjpyop
    ========================================================================== */
 function initFormHandler() {
   const form = document.getElementById('quoteForm');
@@ -724,7 +725,7 @@ function initFormHandler() {
 
   const feedback = document.getElementById('formFeedback');
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const name = form.querySelector('[name="name"]')?.value.trim();
@@ -769,57 +770,73 @@ function initFormHandler() {
       return;
     }
 
-    const quoteId = 'RC-' + Math.floor(1000 + Math.random() * 9000);
-    const businessEmail = 'redcanyonred@gmail.com';
-    const subject = encodeURIComponent(`[100% Fixed-Price Quote #${quoteId}] - ${name} - ${location}`);
-    const body = encodeURIComponent(
-      `Hello Red Canyon Remodeling LLC Team,\n\n` +
-      `I would like to request an official in-home consultation and fixed-price remodeling proposal:\n\n` +
-      `===================================================\n` +
-      `PROJECT ESTIMATE FILE #${quoteId}\n` +
-      `===================================================\n` +
-      `• Homeowner Name: ${name}\n` +
-      `• Primary Email: ${email}\n` +
-      `• Arizona City / Neighborhood: ${location}\n` +
-      `• Property Type: ${propertyType} (Approx Age: ${propertyAge})\n` +
-      `• Selected Remodel Spaces: ${scopeSummary}\n` +
-      `• Planned Investment Range: ${budget}\n` +
-      `• Financing Method: ${financing}\n` +
-      `• Residing in Home During Work: ${occupancy}\n` +
-      `• HOA Review Required: ${hoa}\n` +
-      `• Blueprints / City Permits: ${plans}\n` +
-      `• Target Groundbreak Timeline: ${timeline}\n` +
-      `• Service Policies & Conditions: Accepted & Agreed\n` +
-      `===================================================\n\n` +
-      `ARCHITECTURAL VISION & CUSTOM SPECIFICATIONS:\n` +
-      `${message}\n\n` +
-      `I understand Red Canyon provides 100% fixed-price certainty and a Comprehensive Craftsmanship Warranty.\n` +
-      `Please contact me to schedule our on-site architectural evaluation.\n\n` +
-      `Thank you,\n${name}`
-    );
-
-    const mailtoUrl = `mailto:${businessEmail}?subject=${subject}&body=${body}`;
-
-    if (feedback) {
-      feedback.className = 'form-feedback success';
-      feedback.innerHTML = `
-        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-          <div style="color: #4ade80; font-size: 1.5rem; line-height: 1;">✓</div>
-          <div>
-            <strong style="font-size: 1.05rem;">Estimate File #${quoteId} Created!</strong><br>
-            Thank you, ${name}. Your comprehensive project questionnaire has been structured for direct submission to <strong>${businessEmail}</strong>.<br><br>
-            <a href="${mailtoUrl}" class="btn btn-primary btn-sm" style="display: inline-flex;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              Click Here to Open Email Client & Send
-            </a>
-          </div>
-        </div>
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+        <span>Transmitting Estimate Request...</span>
       `;
-      feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // Attempt to launch client
-    window.location.href = mailtoUrl;
+    const quoteId = 'RC-' + Math.floor(1000 + Math.random() * 9000);
+
+    // Prepare FormData payload for Formspree endpoint
+    const formData = new FormData(form);
+    formData.set('Quote_File_ID', quoteId);
+    formData.set('Selected_Scopes', scopeSummary);
+    formData.set('_subject', `[New Project Quote #${quoteId}] ${name} - ${location}`);
+
+    try {
+      const response = await fetch('https://formspree.io/f/xljjpyop', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        if (feedback) {
+          feedback.className = 'form-feedback success';
+          feedback.innerHTML = `
+            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+              <div style="color: #4ade80; font-size: 1.5rem; line-height: 1;">✓</div>
+              <div>
+                <strong style="font-size: 1.1rem; color: var(--text-white);">Estimate Request #${quoteId} Successfully Submitted!</strong><br>
+                Thank you, <strong>${name}</strong>. Your project specifications have been securely routed to the Red Canyon Remodeling LLC contractor team.<br>
+                A licensed project estimator will review your project details and contact you at <strong>${email}</strong> within 24 business hours.
+              </div>
+            </div>
+          `;
+          feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        form.reset();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        let errorMsg = 'Oops! There was a problem submitting your form. Please try again.';
+        if (data && data.errors && data.errors.length) {
+          errorMsg = data.errors.map(err => err.message).join(', ');
+        }
+        if (feedback) {
+          feedback.className = 'form-feedback error';
+          feedback.innerHTML = `<strong>Submission Notice:</strong> ${errorMsg} <br>You can also reach our estimators directly at <a href="mailto:redcanyonred@gmail.com" style="color: var(--text-white); text-decoration: underline;">redcanyonred@gmail.com</a> or call <a href="tel:4809099379" style="color: var(--text-white); text-decoration: underline;">(480) 909-9379</a>.`;
+          feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    } catch (err) {
+      if (feedback) {
+        feedback.className = 'form-feedback error';
+        feedback.innerHTML = `<strong>Network Notice:</strong> Unable to connect to the submission service. Please check your internet connection or reach our contractor directly at <a href="tel:4809099379" style="color: var(--text-white); text-decoration: underline;">(480) 909-9379</a> or <a href="mailto:redcanyonred@gmail.com" style="color: var(--text-white); text-decoration: underline;">redcanyonred@gmail.com</a>.`;
+        feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+      }
+    }
   });
 }
 
